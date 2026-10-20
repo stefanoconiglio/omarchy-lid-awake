@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.stefanoconiglio.lid-awake",
+  "name": "Lid awake",
+  "version": "1.0.0",
+  "author": "Stefano Coniglio",
+  "license": "MIT",
+  "description": "What closing the lid does right now: lit while lid-awake keeps the laptop working with the lid closed, dim while closing the lid puts it to sleep. A click turns lid-awake on or off.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Lid awake",
+    "description": "Keep working with the lid closed; click to turn on or off",
+    "category": "Status",
+    "allowMultiple": false,
+    "defaultSection": "center"
+  }
+}
