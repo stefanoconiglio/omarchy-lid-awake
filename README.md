@@ -32,25 +32,26 @@ interval at which the widget reads `lid-awake status` and logind's `Docked`.
 
 ## Install
 
-Needs Omarchy Quattro (the Quickshell-based `omarchy-shell`) and an executable
-`~/.local/bin/lid-awake` that answers `lid-awake status` with `on` or `off` and
-takes `lid-awake on` and `lid-awake off`, exiting non-zero when it fails. Mine
-is a short bash script around `systemd-run --user` and `systemd-inhibit
---what=handle-lid-switch:sleep:idle --mode=block`; it is not part of this
-repository.
+Needs Omarchy Quattro (the Quickshell-based `omarchy-shell`) and
+`~/.local/bin/lid-awake`: the script is in this repository, `bin/lid-awake`
+(its header explains it), a short bash script around `systemd-run --user` and
+`systemd-inhibit --what=handle-lid-switch:sleep:idle --mode=block`. The widget
+only needs it to answer `lid-awake status` with `on` or `off` and to take
+`lid-awake on` and `lid-awake off`, exiting non-zero when it fails.
+
+From a clone, link the script and the plugin, then enable it:
 
 ```bash
-omarchy plugin add https://github.com/stefanoconiglio/omarchy-lid-awake.git --enable
-omarchy bar move io.github.stefanoconiglio.lid-awake --section center --before omarchy.clock
-```
-
-Or, from a clone, link it and enable it:
-
-```bash
+git clone https://github.com/stefanoconiglio/omarchy-lid-awake.git ~/repos/omarchy-lid-awake
+ln -s ~/repos/omarchy-lid-awake/bin/lid-awake ~/.local/bin/lid-awake
 ln -s ~/repos/omarchy-lid-awake ~/.config/omarchy/plugins/io.github.stefanoconiglio.lid-awake
 omarchy-shell shell rescanPlugins
 omarchy plugin enable io.github.stefanoconiglio.lid-awake --section center --before omarchy.clock
 ```
+
+`lid-awake` alone toggles; `lid-awake on`, `off` and `status` do what they say.
+Never turn it off with the lid closed and no external monitor: logind then
+suspends the laptop at once.
 
 ## Scripting
 

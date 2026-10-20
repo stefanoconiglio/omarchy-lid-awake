@@ -1,0 +1,126 @@
+#!/bin/bash
+#
+# lid-awake [on|off|status]: keep the laptop computing with the lid closed.
+# With no argument it toggles, so running it again undoes it.
+#
+# On, a systemd user unit (lid-awake.service) holds a logind block inhibitor on
+# handle-lid-switch, sleep and idle, so closing the lid, the menu's Suspend and
+# idle timeouts never suspend the machine. The unit also puts Omarchy on Stay
+# Awake (no screensaver, no idle lock) and runs a watcher that turns the display
+# off while the lid is closed, so the panel does not stay lit behind it, and
+# back on when the lid opens. Only the laptop's own panel is turned off (eDP,
+# LVDS, DSI): virtual displays (Hyprland's headless outputs, which an agent
+# draws and screenshots its test windows on) stay on, unseen. The unit lives outside the terminal, so it
+# survives the terminal or Claude being killed; it ends at `lid-awake off`,
+# logout or reboot. Run from a terminal, `on` also turns the screen off after
+# 5 seconds unless a key is pressed.
+#
+# Off stops the unit, which releases the inhibitor, and sets Omarchy back to
+# idling normally; the unit's stop hook does the same if it ever dies on its
+# own. The power profile is left as it is.
+
+UNIT=lid-awake
+SELF=$(readlink -f "$0")
+IDLE=$(command -v omarchy-toggle-idle)
+
+is_on() {
+  systemctl --user is-active --quiet "$UNIT"
+}
+
+# The laptop's own panels that are lit (eDP, LVDS, DSI), by name.
+lit_panels() {
+  hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.name | test("^(eDP|LVDS|DSI)")) | select(.dpmsStatus) | .name' 2>/dev/null
+}
+
+# Turn off the laptop's own panels only, not virtual displays.
+panels_off() {
+  local m
+  for m in $(lit_panels); do
+    hyprctl dispatch "hl.dsp.dpms({ action = \"disable\", monitor = \"$m\" })" >/dev/null 2>&1 || true
+  done
+}
+
+# Runs inside the unit as the child of systemd-inhibit. If it exits, the
+# inhibitor goes with it and the laptop can suspend, so nothing here may fail.
+watch_lid() {
+  local was_closed=0
+  while true; do
+    if omarchy-hw-laptop-closed && ! omarchy-hw-external-monitors; then
+      if [[ -n $(lit_panels) ]]; then
+        panels_off
+      fi
+      was_closed=1
+    elif (( was_closed )); then
+      omarchy-brightness-display on >/dev/null 2>&1 || true
+      was_closed=0
+    fi
+    sleep 5
+  done
+}
+
+turn_on() {
+  if is_on; then
+    "$IDLE" stay-awake >/dev/null
+    echo "lid-awake is already on."
+    return
+  fi
+  systemctl --user reset-failed "$UNIT" 2>/dev/null
+  systemd-run --user --quiet --collect --unit="$UNIT" \
+    --description="Keep computing with the lid closed" \
+    -p ExecStartPre="$IDLE stay-awake" \
+    -p ExecStopPost="$IDLE allow-idle" \
+    -- systemd-inhibit --what=handle-lid-switch:sleep:idle --mode=block \
+       --who="lid-awake" --why="Keep computing with the lid closed" \
+       "$SELF" --watch || exit 1
+  sleep 1
+  if ! is_on; then
+    echo "lid-awake failed to start; see: journalctl --user -u $UNIT" >&2
+    exit 1
+  fi
+  echo "lid-awake on: closing the lid will not suspend the laptop, Omarchy stays"
+  echo "awake, and the display turns off while the lid is closed. This holds on"
+  echo "battery too: run 'lid-awake' again before unplugging it and putting it away."
+
+  # Blank the screen right away unless the user answers. Only asked at a
+  # terminal: from a keybinding or an agent nobody could answer, and the
+  # watcher blanks it once the lid closes anyway. A keypress or mouse movement
+  # relights it.
+  if [[ -t 0 ]]; then
+    echo
+    echo "The screen turns off in 5 seconds; press any key to keep it on."
+    if read -rsn1 -t 5; then
+      echo "The screen stays on."
+    else
+      panels_off
+    fi
+  fi
+}
+
+# Setting Omarchy back to idling runs even when the unit is already gone, so
+# `lid-awake off` also clears a Stay Awake left behind by a power loss.
+turn_off() {
+  if ! is_on; then
+    "$IDLE" allow-idle >/dev/null
+    echo "lid-awake is already off."
+    return
+  fi
+  systemctl --user stop "$UNIT"
+  "$IDLE" allow-idle >/dev/null
+  omarchy-brightness-display on >/dev/null 2>&1 || true
+  echo "lid-awake off: closing the lid suspends the laptop again, and Omarchy"
+  echo "idles normally."
+}
+
+case "${1:-toggle}" in
+  toggle) if is_on; then turn_off; else turn_on; fi ;;
+  on) turn_on ;;
+  off) turn_off ;;
+  status)
+    if is_on; then echo "on"; else echo "off"; fi
+    ;;
+  --watch) watch_lid ;;
+  *)
+    echo "Usage: lid-awake [on|off|status]  (no argument toggles)" >&2
+    exit 1
+    ;;
+esac
