@@ -102,11 +102,15 @@ BarWidget {
 
   // lid-awake's own messages go to its terminal, which a click has none of, so a
   // failure is said in a notification; the bars of every screen read again.
+  // Exit 3 is lid-awake refusing to turn off with the lid closed and nothing docked.
   Process {
     id: switchProc
     property string verb: ""
     onExited: function(exitCode) {
-      if (exitCode !== 0)
+      if (exitCode === 3)
+        Quickshell.execDetached(["notify-send", "lid-awake stays on",
+          "The lid is closed and no monitor is docked: turning it off would suspend the laptop. Open the lid, or run: lid-awake off --force"])
+      else if (exitCode !== 0)
         Quickshell.execDetached(["notify-send", "-u", "critical", "lid-awake " + verb + " failed",
           "See: journalctl --user -u lid-awake"])
       root.broadcast("refresh")

@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# lid-awake [on|off|status]: keep the laptop computing with the lid closed.
-# With no argument it toggles, so running it again undoes it.
+# lid-awake [on|off|status] [--force]: keep the laptop computing with the lid
+# closed. With no argument it toggles, so running it again undoes it.
 #
 # On, a systemd user unit (lid-awake.service) holds a logind block inhibitor on
 # handle-lid-switch, sleep and idle, so closing the lid, the menu's Suspend and
@@ -18,6 +18,11 @@
 # Off stops the unit, which releases the inhibitor, and sets Omarchy back to
 # idling normally; the unit's stop hook does the same if it ever dies on its
 # own. The power profile is left as it is.
+#
+# Off (and the toggle, when it would turn it off) refuses while the lid is
+# closed and no external monitor is docked, and exits 3: releasing the block
+# then makes logind act on the closed lid at once and suspend the laptop (20 Oct
+# 2026, 11:44). --force turns it off anyway.
 
 UNIT=lid-awake
 SELF=$(readlink -f "$0")
@@ -25,6 +30,17 @@ IDLE=$(command -v omarchy-toggle-idle)
 
 is_on() {
   systemctl --user is-active --quiet "$UNIT"
+}
+
+logind_flag() {
+  busctl get-property org.freedesktop.login1 /org/freedesktop/login1 \
+    org.freedesktop.login1.Manager "$1" 2>/dev/null
+}
+
+# Turning off now would suspend the laptop: logind reads the lid as closed and
+# nothing docked. A property it cannot read never blocks.
+off_would_suspend() {
+  [[ $(logind_flag LidClosed) == "b true" && $(logind_flag Docked) != "b true" ]]
 }
 
 # The laptop's own panels that are lit (eDP, LVDS, DSI), by name.
@@ -104,6 +120,12 @@ turn_off() {
     echo "lid-awake is already off."
     return
   fi
+  if (( ! force )) && off_would_suspend; then
+    echo "lid-awake stays on: the lid is closed and no monitor is docked, so turning" >&2
+    echo "it off would suspend the laptop at once. Open the lid, or run" >&2
+    echo "'lid-awake off --force'." >&2
+    exit 3
+  fi
   systemctl --user stop "$UNIT"
   "$IDLE" allow-idle >/dev/null
   omarchy-brightness-display on >/dev/null 2>&1 || true
@@ -111,7 +133,13 @@ turn_off() {
   echo "idles normally."
 }
 
-case "${1:-toggle}" in
+force=0
+args=()
+for a in "$@"; do
+  if [[ $a == --force ]]; then force=1; else args+=("$a"); fi
+done
+
+case "${args[0]:-toggle}" in
   toggle) if is_on; then turn_off; else turn_on; fi ;;
   on) turn_on ;;
   off) turn_off ;;
@@ -120,7 +148,7 @@ case "${1:-toggle}" in
     ;;
   --watch) watch_lid ;;
   *)
-    echo "Usage: lid-awake [on|off|status]  (no argument toggles)" >&2
+    echo "Usage: lid-awake [on|off|status] [--force]  (no argument toggles)" >&2
     exit 1
     ;;
 esac

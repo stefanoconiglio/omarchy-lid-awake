@@ -26,7 +26,8 @@ monitor is unplugged.
 
 Click to turn lid-awake off when the icon is lit and on when it is dim: the
 click does what the tooltip said, even if the state changed meanwhile. A
-failure (lid-awake did not start) comes as a notification. A change made
+failure (lid-awake did not start, or would not turn off with the lid closed)
+comes as a notification. A change made
 elsewhere, from a terminal or another program, shows within 3 seconds, the
 interval at which the widget reads `lid-awake status` and logind's `Docked`.
 
@@ -50,8 +51,10 @@ omarchy plugin enable io.github.stefanoconiglio.lid-awake --section center --bef
 ```
 
 `lid-awake` alone toggles; `lid-awake on`, `off` and `status` do what they say.
-Never turn it off with the lid closed and no external monitor: logind then
-suspends the laptop at once.
+Turning it off with the lid closed and no external monitor would make logind
+suspend the laptop at once, so `lid-awake off` (and the toggle) refuses then,
+exits 3 and says why; a click on the icon says it in a notification.
+`lid-awake off --force` turns it off anyway.
 
 ## Scripting
 
@@ -65,6 +68,8 @@ omarchy-shell io.github.stefanoconiglio.lid-awake toggle    # the same as a left
 running bar: it turns lid-awake off and on, both from the command line and
 through the click, and ends with it on. It refuses to run with the lid
 closed, where turning lid-awake off suspends the laptop at once.
+`tests/refuse_closed_lid.sh` checks the refusal and `--force` against stubs of
+`systemctl` and `busctl`, never the real lid-awake: safe at any time.
 
 On a vertical bar the icon keeps its place and its colours.
 
