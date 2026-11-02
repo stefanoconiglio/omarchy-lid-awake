@@ -33,22 +33,37 @@ interval at which the widget reads `lid-awake status` and logind's `Docked`.
 
 ## Install
 
-Needs Omarchy Quattro (the Quickshell-based `omarchy-shell`) and
-`~/.local/bin/lid-awake`: the script is in this repository, `bin/lid-awake`
-(its header explains it), a short bash script around `systemd-run --user` and
-`systemd-inhibit --what=handle-lid-switch:sleep:idle --mode=block`. The widget
-only needs it to answer `lid-awake status` with `on` or `off` and to take
-`lid-awake on` and `lid-awake off`, exiting non-zero when it fails.
+```bash
+omarchy plugin add https://github.com/stefanoconiglio/omarchy-lid-awake --enable
+omarchy bar move io.github.stefanoconiglio.lid-awake --section center --before omarchy.clock
+```
 
-From a clone, link the script and the plugin, then enable it:
+`--enable` asks for a bar section and puts the icon there; the second line
+moves it where I keep it, just before the clock. The widget runs the
+plugin's own copy of the script,
+`~/.config/omarchy/plugins/io.github.stefanoconiglio.lid-awake/bin/lid-awake`.
+For the terminal command too:
+`ln -s ~/.config/omarchy/plugins/io.github.stefanoconiglio.lid-awake/bin/lid-awake ~/.local/bin/lid-awake`.
+
+Or from a clone of your own, linked in:
 
 ```bash
 git clone https://github.com/stefanoconiglio/omarchy-lid-awake.git ~/repos/omarchy-lid-awake
-ln -s ~/repos/omarchy-lid-awake/bin/lid-awake ~/.local/bin/lid-awake
+ln -s ~/repos/omarchy-lid-awake/bin/lid-awake ~/.local/bin/lid-awake   # for the terminal
 ln -s ~/repos/omarchy-lid-awake ~/.config/omarchy/plugins/io.github.stefanoconiglio.lid-awake
 omarchy-shell shell rescanPlugins
 omarchy plugin enable io.github.stefanoconiglio.lid-awake --section center --before omarchy.clock
 ```
+
+Needs Omarchy Quattro (the Quickshell-based `omarchy-shell`). The script,
+`bin/lid-awake` (its header explains it), is a short bash script around
+`systemd-run --user` and
+`systemd-inhibit --what=handle-lid-switch:sleep:idle --mode=block`; it also
+uses `systemctl`, `busctl` and `journalctl` (systemd), `hyprctl`, `jq`, and
+Omarchy's own `omarchy-toggle-idle`, `omarchy-brightness-display`,
+`omarchy-hw-laptop-closed` and `omarchy-hw-external-monitors`. The widget
+adds `sh`, `busctl` (logind's `Docked`), `notify-send` and UPower (through
+Quickshell).
 
 `lid-awake` alone toggles; `lid-awake on`, `off` and `status` do what they say.
 Turning it off with the lid closed and no external monitor would make logind
@@ -56,10 +71,32 @@ suspend the laptop at once, so `lid-awake off` (and the toggle) refuses then,
 exits 3 and says why; a click on the icon says it in a notification.
 `lid-awake off --force` turns it off anyway.
 
+## Remove
+
+Turn lid-awake off first, with the lid open (or an external monitor
+connected: with the lid closed and nothing docked it refuses, and
+`--force` suspends the laptop at once), then remove the plugin:
+
+```bash
+lid-awake off      # or a click on the icon, if it is lit
+omarchy plugin remove io.github.stefanoconiglio.lid-awake
+rm -f ~/.local/bin/lid-awake   # if you made the link
+```
+
+Without the link, the first line is
+`~/.config/omarchy/plugins/io.github.stefanoconiglio.lid-awake/bin/lid-awake off`.
+If the plugin went while lid-awake was on, `systemctl --user stop lid-awake`
+turns it off all the same (it also puts Omarchy back to idling normally).
+
+`omarchy plugin remove` takes the icon out of the bar when it was in it;
+if `io.github.stefanoconiglio.lid-awake` is still listed in
+`~/.config/omarchy/shell.json`, delete that entry and run
+`omarchy restart shell`.
+
 ## Scripting
 
 ```bash
-omarchy-shell io.github.stefanoconiglio.lid-awake state     # JSON: on, docked, onBattery, tooltip
+omarchy-shell io.github.stefanoconiglio.lid-awake state     # JSON: on, docked, onBattery, tooltip, command
 omarchy-shell io.github.stefanoconiglio.lid-awake refresh   # read lid-awake again at once
 omarchy-shell io.github.stefanoconiglio.lid-awake toggle    # the same as a left click
 ```

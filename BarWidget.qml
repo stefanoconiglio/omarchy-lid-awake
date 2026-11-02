@@ -5,7 +5,7 @@ import Quickshell.Services.UPower
 import qs.Commons
 import qs.Ui
 
-// What closing the lid does right now, from lid-awake (~/.local/bin/lid-awake):
+// What closing the lid does right now, from lid-awake (bin/lid-awake beside it):
 // while it is on, its user unit holds logind's block on the lid switch and the
 // laptop keeps working with the lid closed; while it is off, closing the lid
 // suspends. One laptop icon at the size of Omarchy's indicators beside it, always
@@ -19,7 +19,9 @@ BarWidget {
   id: root
   moduleName: "io.github.stefanoconiglio.lid-awake"
 
-  readonly property string lidAwake: Quickshell.env("HOME") + "/.local/bin/lid-awake"
+  // The plugin's own copy, so a plugin added with `omarchy plugin add` works
+  // without the link in ~/.local/bin (which is only for the terminal).
+  readonly property string lidAwake: decodeURIComponent(String(Qt.resolvedUrl("bin/lid-awake")).replace(/^file:\/\//, ""))
 
   // Unknown until the first read answers "on" or "off".
   property bool known: false
@@ -89,7 +91,8 @@ BarWidget {
         on: root.on,
         docked: root.docked,
         onBattery: root.onBattery,
-        tooltip: root.tooltip
+        tooltip: root.tooltip,
+        command: root.lidAwake
       })
     }
   }
