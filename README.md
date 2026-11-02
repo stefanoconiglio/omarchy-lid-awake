@@ -88,10 +88,10 @@ Without the link, the first line is
 If the plugin went while lid-awake was on, `systemctl --user stop lid-awake`
 turns it off all the same (it also puts Omarchy back to idling normally).
 
-`omarchy plugin remove` takes the icon out of the bar when it was in it;
-if `io.github.stefanoconiglio.lid-awake` is still listed in
-`~/.config/omarchy/shell.json`, delete that entry and run
-`omarchy restart shell`.
+`omarchy plugin remove` takes the icon out of the bar before it deletes the
+plugin. An entry is left in `~/.config/omarchy/shell.json` only when the
+plugin's folder was deleted by hand; then
+`omarchy plugin disable io.github.stefanoconiglio.lid-awake` clears it.
 
 ## Scripting
 
